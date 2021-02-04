@@ -1,0 +1,5 @@
+Thu Feb  4 18:28:18 2021 w:1.0 decay=1.0e-04 Global Step:100 Macro_F1:0.7626, Micro_F1:0.7669
+Thu Feb  4 18:33:44 2021 w:1.0 decay=1.0e-04 Global Step:100 Macro_F1:0.8260, Micro_F1:0.8276
+Thu Feb  4 18:41:12 2021 w:1.0 decay=1.0e-04 Global Step:100 Macro_F1:0.8299, Micro_F1:0.8319
+Thu Feb  4 18:45:30 2021 w:1.0 decay=1.0e-04 Global Step:100 Macro_F1:0.8316, Micro_F1:0.8341
+Thu Feb  4 18:49:32 2021 w:1.0 decay=1.0e-04 Global Step:200 Macro_F1:0.8140, Micro_F1:0.8179
