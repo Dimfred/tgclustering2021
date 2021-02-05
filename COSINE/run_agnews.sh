@@ -16,8 +16,9 @@ python3.8 main.py \
 	--task_type=tc \
 	--data_dir="data/${task}" \
 	--rule=1 \
-	--logging_steps=100 \
-	--self_train_logging_steps=100 \
+	# --logging_steps=100 \
+	--logging_steps=300 \
+	--self_train_logging_steps=300 \
 	--gpu="${gpu}" \
 	--num_train_epochs=3 \
 	--weight_decay=1e-4 \

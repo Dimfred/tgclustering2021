@@ -70,7 +70,7 @@ def main(args):
             trainer.train()
             trainer.save_features()
         elif args.method == "selftrain":
-            trainer.train()
+            # trainer.train()
             trainer.selftrain(soft=args.soft_label) #, adv=args.add_adv)
 
     if args.do_eval:
