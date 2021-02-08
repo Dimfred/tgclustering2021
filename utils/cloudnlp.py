@@ -4,14 +4,7 @@ import json
 import re
 
 from config import config
-
-
-def load_tg_dataset(idx):
-    with open(config.tg_ds / f"{str(idx).zfill(2)}-data.txt", encoding="utf8") as f:
-        lines = f.readlines()
-
-    dataset = [json.loads(line) for line in lines]
-    return dataset
+import utils
 
 
 def concat_ds_item(ds):
@@ -39,15 +32,20 @@ def write_result(file, idx, res):
 
 
 if __name__ == "__main__":
-    # import sys
-    # sys.exit()
 
-    labels_out = "00-raw.txt"
+    dataset_num = 2
+
+    labels_out = utils.make_raw_path(dataset_num)
+    ds = utils.load_data(dataset_num)
+    lang = utils.load_lang(dataset_num)
 
     client = lv1.LanguageServiceClient()
 
-    ds = load_tg_dataset(0)
-    for idx, item in enumerate(ds):
+    for idx, (item, lang) in enumerate(zip(ds, lang)):
+        lang = lang[1]
+        if lang != "en":
+            continue
+
         text = concat_ds_item(item)
         # text = concat_ds_item(ds[14])
         doc = lv1.Document(content=text, type_=lv1.Document.Type.PLAIN_TEXT)

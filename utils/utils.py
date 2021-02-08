@@ -3,6 +3,7 @@ import time
 from config import config
 import json
 import enum
+import numpy as np
 
 
 def seed(*args):
@@ -41,7 +42,7 @@ def make_lang_path(num):
 
 
 def make_topic_path(num):
-    return config.tg_ds / f"{str(num).zfill(2)}-topic.txt"
+    return config.tg_ds / f"{str(num).zfill(2)}-handtopic.txt"
 
 
 def make_data_path(num):
@@ -54,6 +55,10 @@ def make_cleansed_path(num):
 
 def make_cleansed_data_path(num):
     return config.tg_ds / f"{str(num).zfill(2)}-cleansed-data.txt"
+
+
+def make_snorkel_out_path(num):
+    return config.tg_ds / f"{str(num).zfill(2)}-snorkel.txt"
 
 
 def load_raw(num):
@@ -83,12 +88,14 @@ def load_lang(num):
     return lines
 
 
-def load_topics():
-    path = config.topics
+def load_topics(num):
+    path = make_topic_path(num)
     with open(path, "r") as f:
         lines = f.readlines()
 
-    lines = [l.strip() for l in lines]
+    lines = [l.strip().split(",") for l in lines]
+    lines = [(int(idx), topics) for idx, *topics in lines]
+
     return lines
 
 
@@ -122,6 +129,55 @@ def load_cleansed_data(num):
     lines = [l.strip().split(",", 1) for l in lines]
     lines = [(int(idx), text) for idx, text in lines]
     return lines
+
+
+def load_snorkel_out(num):
+    path = make_snorkel_out_path(num)
+    with open(path, "r") as f:
+        lines = f.readlines()
+
+    lines = [l.strip().split(";", 2) for l in lines]
+
+    snorkel_out = []
+    for idx, csv_labels, text in lines:
+        idx = int(idx)
+        label_nums = [int(l) for l in csv_labels.split(",")]
+
+        one_hot_labels = [0 for _ in range(42)]
+        for label_num in label_nums:
+            one_hot_labels[label_num] = 1
+
+        snorkel_out.append((idx, one_hot_labels, text))
+
+    return snorkel_out
+
+
+def load_test_data(num):
+    cleansed_data = load_cleansed_data(num)
+    cleansed_data = {idx: text for idx, text in cleansed_data}
+
+    labeled_topics = load_topics(num)
+
+    n_missing_cleansed = 0
+
+    test_data = []
+    for idx, hand_labels in labeled_topics:
+        if idx not in cleansed_data:
+            n_missing_cleansed += 1
+            continue
+
+        clean_text = cleansed_data[idx]
+
+        one_hot = [0 for _ in range(42)]
+        for hand_label in hand_labels:
+            label_idx = topics.index(hand_label)
+            one_hot[label_idx] = 1
+
+        test_data.append((idx, one_hot, clean_text))
+
+    print("Missing Cleansed", n_missing_cleansed)
+
+    return test_data
 
 
 def flatten(list_of_lists):
@@ -177,49 +233,50 @@ topics = [
     "Other",
 ]
 
+
 class Topics(enum.Enum):
     NONE = -1
-    ArtDesign = 0 # DONE
-    BetsGambling = 1 # DONE
-    Books = 2 # DONE
+    ArtDesign = 0  # DONE
+    BetsGambling = 1  # DONE
+    Books = 2  # DONE
     BusinessEntrepreneurship = 3
-    CarsOtherVehicles = 4 # DONE
+    CarsOtherVehicles = 4  # DONE
     CelebritiesLifestyle = 5
-    Cryptocurrencies = 6 # TODO problems with invest
+    Cryptocurrencies = 6  # TODO problems with invest
     CultureEvents = 7
     CuriousFacts = 8
-    DirectoriesofChannelsBots = 9 # DONE
+    DirectoriesofChannelsBots = 9  # DONE
     EconomyFinance = 10
-    Education = 11 # DONE
-    EroticContent = 12 # DONE
-    FashionBeauty = 13 # DONE
-    Fitness = 14 # DONE
-    FoodCooking = 15 # DONE
+    Education = 11  # DONE
+    EroticContent = 12  # DONE
+    FashionBeauty = 13  # DONE
+    Fitness = 14  # DONE
+    FoodCooking = 15  # DONE
     ForeignLanguages = 16
-    HealthMedicine = 17 # DONE
+    HealthMedicine = 17  # DONE
     History = 18
     HobbiesActivities = 19
-    HomeArchitecture = 20 # DONE
-    HumorMemes = 21 # DONE
-    Investments = 22 # TODO problems with crypto
-    JobListings = 23 # DONE
+    HomeArchitecture = 20  # DONE
+    HumorMemes = 21  # DONE
+    Investments = 22  # TODO problems with crypto
+    JobListings = 23  # DONE
     KidsParenting = 24
     MarketingPR = 25
     MotivationSelfDevelopment = 26
-    Movies = 27 # DONE
-    Music = 28 # DONE
+    Movies = 27  # DONE
+    Music = 28  # DONE
     OffersPromotions = 29
-    Pets = 30 # DONE
-    PoliticsIncidents = 31 # DONE
-    PsychologyRelationships = 32 # Relationship at least
-    RealEstate = 33 # DONE
+    Pets = 30  # DONE
+    PoliticsIncidents = 31  # DONE
+    PsychologyRelationships = 32  # Relationship at least
+    RealEstate = 33  # DONE
     RecreationEntertainment = 34
-    ReligionSpirituality = 35 # DONE
-    Science = 36 # DONE
-    Sports = 37 # DONE
-    TechnologyInternet = 38 # DONE
-    TravelTourism = 39 # DONE
-    VideoGames = 40 # TODO interference with crypto
+    ReligionSpirituality = 35  # DONE
+    Science = 36  # DONE
+    Sports = 37  # DONE
+    TechnologyInternet = 38  # DONE
+    TravelTourism = 39  # DONE
+    VideoGames = 40  # TODO interference with crypto
     Other = 41
 
     # TODO look at /Law & Government

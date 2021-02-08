@@ -102,6 +102,8 @@ search_crypto_words = re.compile(search_crypto_words)
 
 @lf()
 def crypto(x):
+    # TODO payment mothod: bitcoin ignore!
+
     x = x["text"]
     crypto_words = search_crypto_words.findall(x)
     if len(crypto_words) > 3:
@@ -673,8 +675,8 @@ def directories_of_channels_and_bots(x):
     # TODO look at the match and check whether the same name appears that often
     count_bot_names = Counter(has_bot_name)
     if count_bot_names and max(count_bot_names.values()) > 3:
-        print(has_bot_name)
-        print(text)
+        # print(has_bot_name)
+        # print(text)
 
         return Topics.DirectoriesofChannelsBots.value
 
@@ -734,6 +736,16 @@ def other(x):
 #################
 # all
 #################
+
+
+@lf()
+def dummy1(x):
+    return Topics.NONE.value
+
+
+@lf()
+def dummy2(x):
+    return Topics.NONE.value
 
 
 lfs = [
@@ -817,10 +829,28 @@ def look_through_labels(labeled):
 
         input()
 
+def write_labels(dataset_num, df_train, labels):
+    with open(utils.make_snorkel_out_path(dataset_num), "w") as f:
+        for lidx, label in enumerate(labels):
+            has_label = np.any(label != -1)
+            if not has_label:
+                continue
+
+            df_item = df_train.iloc[lidx]
+
+            # original idx
+            oidx = df_item["idx"]
+            text = df_item["text"]
+            label_row = ",".join([str(l) for l in label[label != -1]])
+
+            formatted_row = f"{oidx};{label_row};{text}"
+            print(formatted_row, file=f)
+
 
 def main():
-    data = utils.load_cleansed_data(0)
-    raw = utils.load_raw(0)
+    dataset_num = 0
+    data = utils.load_cleansed_data(dataset_num)
+    raw = utils.load_raw(dataset_num)
 
     combined_data = []
     for idx, text in data:
@@ -836,19 +866,31 @@ def main():
 
     df_train = pd.DataFrame(combined_data, columns=["idx", "text", "google_label"])
 
-    applier = PandasLFApplier(lfs=lfs)
-    label_train = applier.apply(df=df_train)
-    analysis = LFAnalysis(L=label_train, lfs=lfs).lf_summary()
-    print(analysis)
+    labeled_data = []
+    for lf in lfs:
+        used_lfs = [lf, dummy1, dummy2]
 
-    where_label = print_initial_coverage(df_train, label_train)
+        applier = PandasLFApplier(lfs=used_lfs)
+        label_train = applier.apply(df=df_train)
 
-    # cardinality = 42
-    label_model = LabelModel(cardinality=42, verbose=True)
-    label_model.fit(label_train, n_epochs=500, log_freq=50, seed=1337)
-    df_train["label"] = label_model.predict(L=label_train, tie_break_policy="abstain")
+        analysis = LFAnalysis(L=label_train, lfs=used_lfs).lf_summary()
+        print(analysis)
+        where_label = print_initial_coverage(df_train, label_train)
 
-    print_model_coverage(df_train)
+        # cardinality = 42
+        label_model = LabelModel(cardinality=42, verbose=1, device="cuda")
+        label_model.fit(label_train, n_epochs=500, log_freq=50, seed=1337)
+        labeled = label_model.predict(L=label_train, tie_break_policy="abstain")
+
+        labeled_data.append(labeled.reshape(-1, 1))
+
+    labeled_data = np.hstack(labeled_data)
+    print(labeled_data)
+
+    write_labels(dataset_num, df_train, labeled_data)
+
+
+    # print_model_coverage(df_train)
 
 
 if __name__ == "__main__":

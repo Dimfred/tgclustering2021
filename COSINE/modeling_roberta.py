@@ -16,8 +16,8 @@ ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP = {
 }
 
 # mini
-tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
-model = AutoModel.from_pretrained("prajjwal1/bert-tiny")
+# tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
+# model = AutoModel.from_pretrained("prajjwal1/bert-tiny")
 
 class RobertaForSequenceClassification_v2(BertPreTrainedModel):
     config_class = RobertaConfig

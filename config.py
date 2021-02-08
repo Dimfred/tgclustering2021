@@ -29,6 +29,9 @@ config.langdetect_ds = config.data_dir / "langdetect_tatoeba/sentences.csv"
 config.roberta_dir = config.tg_ds / "roberta"
 config.ruberta_dir = config.tg_ds / "ruberta"
 
+config.ru_dir = config.data_dir / "ru"
+config.fact_ru = config.ru_dir / "factRuEval-2016-master"
+
 ##############
 # langdetect
 ##############
