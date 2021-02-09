@@ -31,6 +31,7 @@ config.ruberta_dir = config.tg_ds / "ruberta"
 
 config.ru_dir = config.data_dir / "ru"
 config.fact_ru = config.ru_dir / "factRuEval-2016-master"
+config.wiki_ru = config.ru_dir / "ruwiki-latest-pages-articles.xml.bz2"
 
 ##############
 # langdetect
