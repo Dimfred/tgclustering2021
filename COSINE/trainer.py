@@ -120,6 +120,7 @@ class Trainer(object):
         l -= confreg * (
             torch.sum(input * w.unsqueeze(1)) + np.log(n_classes_) * n_classes_
         )
+
         return l
 
     def contrastive_loss(
@@ -295,8 +296,10 @@ class Trainer(object):
 
                 if self.args.gradient_accumulation_steps > 1:
                     loss = loss / self.args.gradient_accumulation_steps
+
                 if torch.cuda.device_count() > 1:
                     loss = loss.mean()
+
                 selftrain_loss += loss.item()
                 loss.backward()
                 if (step + 1) % self.args.gradient_accumulation_steps == 0:

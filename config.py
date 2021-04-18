@@ -52,4 +52,6 @@ config.langdetect.n_trigram_features = 200
 
 config.snorkel_dir =  config.data_dir / "snorkel"
 config.porn_websites = config.snorkel_dir / "porn_websites.txt"
-config.snorkel_conf_thresh = 0.6
+config.snorkel_conf_thresh = 0.8
+# config.language = "ru"
+config.language = "en"

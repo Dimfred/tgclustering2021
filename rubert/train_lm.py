@@ -17,35 +17,6 @@ import copy
 import sys
 
 
-class RuDataset(t.utils.data.Dataset):
-    def __init__(self, tokenizer, eval=False):
-        self.tokenizer = tokenizer
-        fact_ru = [item.text for item in cor.load_factru(config.fact_ru)]
-        wiki_ru = []
-        wiki_ru = [item.text for item in cor.load_wiki(config.wiki_ru)]
-        # with open(config.wiki_ru, "r") as f:
-        #     for line in f:
-        #         print(line)
-
-        self.data = fact_ru + wiki_ru
-
-        # for item in fact_ru:
-        #     self.data.extend(item)
-
-        # for item in wiki_ru:
-        #     self.data.extend(wiki_ru)
-
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, i):
-        return self.tokenizer.encode_plus(
-            self.data[i], max_length=128, truncation=True, padding=True
-        )
-
-
-
 def check():
     mname = "outputs/checkpoint-130000"
     fill_mask = pipeline(
@@ -77,21 +48,47 @@ def check():
     
     sys.exit()
 
-check()
+class RuDataset(t.utils.data.Dataset):
+    def __init__(self, tokenizer, eval=False):
+        self.tokenizer = tokenizer
+        self.tokenizer_params = {
+            "max_length": 128, 
+            "truncation": True, 
+            "add_special_tokens": True,
+        }
+        fact_ru = [item.text for item in cor.load_factru(config.fact_ru)]
 
-tokenizer = AutoTokenizer.from_pretrained("DeepPavlov/rubert-base-cased", max_len=512)
+        # TEST
+        self.tokenizer.encode_plus(fact_ru[0], **self.tokenizer_params)
+
+        lenta_ru = []
+        lenta_ru = [item.text for item in cor.load_lenta(config.lenta_ru)]
+
+        wiki_ru = []
+        #wiki_ru = [item.text for item in cor.load_wiki(config.wiki_ru)]
+        with open("data/ru/wiki.txt", "r") as f:
+            wiki_ru = [l.strip() for l in f if len(l) > 35]
+
+        self.data = fact_ru + wiki_ru + lenta_ru
+
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, i):
+        return self.tokenizer.encode_plus(self.data[i], **self.tokenizer_params)
+
+
+
+
+#check()
+
+tokenizer = AutoTokenizer.from_pretrained("DeepPavlov/rubert-base-cased", max_len=128)
 model_config = BertConfig.from_json_file("config.json")
 model = BertForMaskedLM(model_config)
+#model = BertForMaskedLM.from_pretrained("outputs/checkpoint-15000")
 
-#model = BertForMaskedLM(
-#print(model.num_parameters())
-
-
-
-#dataset = RuDataset(tokenizer)
-
-
-
+dataset = RuDataset(tokenizer)
 
 data_collator = DataCollatorForLanguageModeling(
     tokenizer=tokenizer, mlm=True, mlm_probability=0.15
@@ -106,10 +103,11 @@ trainer = Trainer(
     args=TrainingArguments(
         output_dir="outputs",
         overwrite_output_dir=True,
-        num_train_epochs=10,
-        per_device_train_batch_size=11,
-        save_steps=10_000,
-        save_total_limit=100,
+        num_train_epochs=5,
+        per_device_train_batch_size=29,
+        save_steps=5_000,
+        save_total_limit=2,
+        gradient_accumulation_steps=2
     ),
 )
 trainer.train()

@@ -1,3 +1,4 @@
+from numpy.lib.ufunclike import fix
 import utils
 from utils import Topics
 from config import config
@@ -5,7 +6,7 @@ from config import config
 
 import snorkel_defaults as sdf
 from snorkel.labeling import PandasLFApplier, LFAnalysis
-from snorkel.labeling.model import LabelModel
+from snorkel.labeling.model import LabelModel, MajorityLabelVoter
 from snorkel.labeling import labeling_function as lf
 
 import pandas as pd
@@ -53,6 +54,15 @@ search_porn = re.compile(search_porn)
 common_porn_provider = r"(brazzers|bangbros|hdpornxxx)"
 search_porn_provider = re.compile(common_porn_provider)
 
+porn_channels = [
+    "@teenporntop",
+    "@hotshotsadultseries",
+    "@adultwebseriescineplex",
+    "@xvideos",
+]
+porn_channels = "|".join(porn_channels)
+search_porn_channels = re.compile("({})".format(porn_channels))
+
 
 @lf()
 def porn(x):
@@ -67,6 +77,13 @@ def porn(x):
 
     porn_provisders = search_porn_provider.findall(text)
     if porn_provisders:
+        return Topics.EroticContent.value
+
+    if "mia khalifa" in text:
+        return Topics.EroticContent.value
+
+    porn_channels = search_porn_channels.findall(text)
+    if porn_channels:
         return Topics.EroticContent.value
 
     return Topics.NONE.value
@@ -116,17 +133,35 @@ def crypto(x):
 # invest
 #################
 
-invest_words = ["forex", "pips", "investment plan", "#invest"]
+invest_words = [
+    "forex",
+    "pips",
+    "investment plan",
+    "#invest",
+    "take profit",
+    "binary trade",
+]
+invest_words = "|".join(invest_words)
 
-search_invest_words = r"({})".format("|".join(invest_words))
+search_invest_words = r"({})".format(invest_words)
 search_invest_words = re.compile(search_invest_words)
 
 
 @lf()
 def investments(x):
-    x = x["text"]
-    invest_words = search_invest_words.findall(x)
+    text = x["text"]
+
+    invest_words = search_invest_words.findall(text)
     if invest_words:
+        return Topics.Investments.value
+
+    if re.findall("binary signal", text):
+        return Topics.Investments.value
+
+    if "free signals" in text:
+        return Topics.Investments.value
+
+    if "gold signals" in text:
         return Topics.Investments.value
 
     return Topics.NONE.value
@@ -157,8 +192,12 @@ def video_games(x):
 
 @lf()
 def travel(x):
+    text = x["text"]
     label = x["google_label"]
     if label is not None and label.contains("Travel", config.snorkel_conf_thresh):
+        return Topics.TravelTourism.value
+
+    if "travelblog" in text:
         return Topics.TravelTourism.value
 
     return Topics.NONE.value
@@ -168,10 +207,19 @@ def travel(x):
 # tech & internet
 #################
 
+tech_words = ["proxy"]
+tech_words = "|".join(tech_words)
+
+search_tech_words = re.compile(r"({})".format(tech_words))
 
 @lf()
 def tech_and_internet(x):
+    text = x["text"]
     label = x["google_label"]
+
+    if len(search_tech_words.findall(text)) > 3:
+        return Topics.TechnologyInternet.value
+
     if label is not None:
         if label.contains("Hacking & Cracking", config.snorkel_conf_thresh):
             return Topics.TechnologyInternet.value
@@ -218,15 +266,23 @@ def science(x):
 # politics & incidents
 #################
 
+politicians = ["biden", "donald trump", "hilary clinton", "white house"]
+politicians = "|".join(politicians)
+
+search_politicians = re.compile(r"({})".format(politicians))
+
 
 @lf()
 def politics(x):
-    # text = x["text"]
+    text = x["text"]
     label = x["google_label"]
 
     if label is not None:
         if label.contains("/News/Politics", config.snorkel_conf_thresh):
             return Topics.PoliticsIncidents.value
+
+    if search_politicians.findall(text):
+        return Topics.PoliticsIncidents.value
 
     return Topics.NONE.value
 
@@ -309,14 +365,21 @@ currency_words = [
     "price",
 ]
 currency_words = "|".join(currency_words)
-
 search_currency = re.compile(r"({})".format(currency_words))
+
+offer_stuff = ["slashdeals.in", "amzn.to", "deals & offers"]
+offer_stuff = "|".join(offer_stuff)
+search_offer_stuff = re.compile(r"({})".format(offer_stuff))
 
 
 @lf()
 def offer(x):
     text = x["text"]
     label = x["google_label"]
+
+    if len(search_offer_stuff.findall(text)) > 3:
+        return Topics.OffersPromotions.value
+
 
     if label is not None:
         if label.contains("/Shopping", config.snorkel_conf_thresh):
@@ -327,9 +390,9 @@ def offer(x):
         if is_sensitive and is_drugs:
             return Topics.OffersPromotions.value
 
-        has_currency = search_currency.findall(text)
-        if label.contains("Video Games") and len(has_currency) > 3:
-            return Topics.OffersPromotions.value
+        # has_currency = search_currency.findall(text)
+        # if label.contains("Video Games") and len(has_currency) > 3:
+        #     return Topics.OffersPromotions.value
 
         if label.contains(
             "Autos & Vehicles", config.snorkel_conf_thresh
@@ -346,7 +409,7 @@ def offer(x):
 
 @lf()
 def religion(x):
-    # text = x["text"]
+    text = x["text"]
     label = x["google_label"]
 
     if label is not None:
@@ -382,16 +445,21 @@ def education(x):
 # job
 #################
 
+search_hour_rate = re.compile(r"[\d+][.]?\d+/h")
+
 
 @lf()
 def job(x):
-    # text = x["text"]
+    text = x["text"]
     label = x["google_label"]
 
     if label is not None:
         # TODO check Jobs/Resumes & Portfolios
         if label.contains("Jobs/Job Listings", config.snorkel_conf_thresh):
             return Topics.JobListings.value
+
+    if search_hour_rate.findall(text):
+        return Topics.JobListings.value
 
     return Topics.NONE.value
 
@@ -492,8 +560,11 @@ def music(x):
 
 @lf()
 def humor_memes(x):
-    # text = x["text"]
+    text = x["text"]
     label = x["google_label"]
+
+    if "bullshit" in text and "meme" in text and "cat" in text:
+        return Topics.HumorMemes.value
 
     if label is not None:
         if label.contains("/Arts & Entertainment/Fun", config.snorkel_conf_thresh):
@@ -512,8 +583,11 @@ def humor_memes(x):
 
 @lf()
 def movies(x):
-    # text = x["text"]
+    text = x["text"]
     label = x["google_label"]
+
+    if "mickey kelley" in text:
+        return Topics.Movies.value
 
     if label is not None:
         if label.contains("/Arts & Entertainment/Movies", config.snorkel_conf_thresh):
@@ -660,6 +734,12 @@ search_payment_bot = re.compile(payment_bot_channel)
 bot_names = r"@[a-zA-Z0-9]+_bot"
 search_bot_names = re.compile(bot_names)
 
+search_registration_date = re.compile(r"registration date:")
+
+fixed_names = ["@awsproxie"]
+fixed_names = "|".join(fixed_names)
+
+search_fixed_bot = re.compile("({})".format(fixed_names))
 
 @lf()
 def directories_of_channels_and_bots(x):
@@ -671,6 +751,10 @@ def directories_of_channels_and_bots(x):
     if has_payment_bot:
         return Topics.DirectoriesofChannelsBots.value
 
+    if search_fixed_bot.findall(text):
+        return Topics.DirectoriesofChannelsBots.value
+
+
     has_bot_name = search_bot_names.findall(text)
     # TODO look at the match and check whether the same name appears that often
     count_bot_names = Counter(has_bot_name)
@@ -678,6 +762,12 @@ def directories_of_channels_and_bots(x):
         # print(has_bot_name)
         # print(text)
 
+        return Topics.DirectoriesofChannelsBots.value
+
+    if "tiger trade" in text:
+        return Topics.DirectoriesofChannelsBots.value
+
+    if len(search_registration_date.findall(text)) > 3:
         return Topics.DirectoriesofChannelsBots.value
 
     return Topics.NONE.value
@@ -701,18 +791,46 @@ def real_estate(x):
 
 
 #################
-# other
+# celebrities
 #################
 
 
 @lf()
-def other(x):
-    # text = x["text"]
+def celebrities(x):
+    text = x["text"]
     label = x["google_label"]
 
     if label is not None:
-        if label.contains("/Pets & Animals/Wildlife", config.snorkel_conf_thresh):
-            return Topics.Other.value
+        if label.contains("Celebrities", config.snorkel_conf_thresh):
+            return Topics.CelebritiesLifestyle.value
+
+    if "Jürgen Klopp" in text:
+        return Topics.CelebritiesLifestyle.value
+
+    return Topics.NONE.value
+
+
+#################
+# other
+#################
+
+others_words = ["@cyka_blyat_army", "#wallpaper"]
+others_words = "|".join(others_words)
+
+search_others_words = re.compile(r"({})".format(others_words))
+
+@lf()
+def other(x):
+    text = x["text"]
+    label = x["google_label"]
+
+    if len(search_others_words.findall(text)) > 3:
+        return Topics.Other.value
+
+    if len(re.findall(r"\d+k", text)) > 20:
+        return Topics.Other.value
+
+    if label is not None:
 
         if label.contains(
             "/Online Communities/Blogging Resources & Services",
@@ -779,19 +897,21 @@ lfs = [
     # business_entrepreneurship,
     directories_of_channels_and_bots,
     real_estate,
+    celebrities,
     other,
 ]
 print(len(lfs))
 
 
-def print_initial_coverage(df, labels):
+def print_initial_coverage(df, labels, name=""):
     n_samples = len(df)
 
     where_label = labels != Topics.NONE.value
     where_label = where_label.sum(axis=1) > 0
     n_labeled = where_label.sum()
 
-    pretty = [["n_samples", n_samples]]
+    pretty = [["Name:", name]]
+    pretty += [["n_samples", n_samples]]
     pretty += [["n_labeled", n_labeled]]
     pretty += [["coverage", "{:.2f}%".format(n_labeled / n_samples * 100)]]
     print(tabulate(pretty))
@@ -829,8 +949,9 @@ def look_through_labels(labeled):
 
         input()
 
-def write_labels(dataset_num, df_train, labels):
-    with open(utils.make_snorkel_out_path(dataset_num), "w") as f:
+
+def write_labels(df_train, labels):
+    with open(utils.make_snorkel_out_path(), "w") as f:
         for lidx, label in enumerate(labels):
             has_label = np.any(label != -1)
             if not has_label:
@@ -839,33 +960,98 @@ def write_labels(dataset_num, df_train, labels):
             df_item = df_train.iloc[lidx]
 
             # original idx
-            oidx = df_item["idx"]
+            ds_idx = df_item["ds_idx"]
+            text_idx = df_item["text_idx"]
             text = df_item["text"]
             label_row = ",".join([str(l) for l in label[label != -1]])
 
-            formatted_row = f"{oidx};{label_row};{text}"
+            formatted_row = f"{ds_idx};{text_idx};{label_row};{text}"
             print(formatted_row, file=f)
 
 
+def print_specific_labels(label_df, *labels):
+    for label in labels:
+        print("FOR:", label)
+        where_label = label_df[label_df["labels"] == label.value]
+        print(
+            *(
+                (ds_idx, text_idx)
+                for ds_idx, text_idx in zip(
+                    where_label["ds_idx"], where_label["text_idx"]
+                )
+            )
+        )
+
 def main():
-    dataset_num = 0
-    data = utils.load_cleansed_data(dataset_num)
-    raw = utils.load_raw(dataset_num)
 
-    combined_data = []
-    for idx, text in data:
-        r = raw[idx]
+    lang_used = "en"
+    dataset_nums = [0, 1, 2, 3]
+    # dataset_nums = [0]  # , 1, 2]
 
-        google_labels = r[1:]
-        # has google labels
-        if len(r) > 2:
-            glabel = GoogleLabel(google_labels)
-            combined_data.append((idx, text.lower(), glabel))
-        else:
-            combined_data.append((idx, text.lower(), None))
+    # datas = [utils.load_data(ds_num, concat=True) for ds_num in dataset_nums]
+    all_datas = [utils.load_cleansed_data(ds_num, lang_used) for ds_num in dataset_nums]
+    all_raws = [utils.load_raw(ds_num) for ds_num in dataset_nums]
+    all_langs = [utils.load_lang(ds_num) for ds_num in dataset_nums]
 
-    df_train = pd.DataFrame(combined_data, columns=["idx", "text", "google_label"])
+    combined = []
+    # for each tg dataset
+    for ds_idx, (data, raw, lang) in enumerate(zip(all_datas, all_raws, all_langs)):
+        # for each text in this dataset
+        for text_idx, text in data.items():
+            # ignore every language except for currently set
+            if lang[text_idx] != lang_used:
+                continue
 
+            # no response from google previously not classified as english
+            if text_idx not in raw:
+                continue
+
+            # has a prediction by google
+            raw_item = raw[text_idx]
+            if len(raw_item) > 2:
+                google_labels = GoogleLabel(raw_item)
+                combined.append((ds_idx, text_idx, text.lower(), google_labels))
+            # has no predicition
+            else:
+                combined.append((ds_idx, text_idx, text.lower(), None))
+
+    df_train = pd.DataFrame(
+        combined, columns=["ds_idx", "text_idx", "text", "google_label"]
+    )
+
+    ######## MULTI LABEL
+    # applier = PandasLFApplier(lfs=lfs)
+    # label_train = applier.apply(df=df_train)
+
+    # model = MajorityLabelVoter(cardinality=42, device="cuda")
+    # preds = model.predict_proba(label_train)
+
+    # counter = [0 for _ in range(42)]
+    # for pred, (idx, df_item) in zip(preds, df_train.iterrows()):
+    #     high_prob_idxs = np.argwhere(pred >= 0.33)
+    #     # print(len(high_prob_idxs))
+    #     if len(high_prob_idxs) == 0:
+    #         continue
+
+    #     hr_labels = [utils.topics[idx[0]] for idx in high_prob_idxs]
+    #     print(df_item["text"])
+
+    #     print(hr_labels)
+    #     print([pred[idx[0]] for idx in high_prob_idxs])
+
+    #     for idx in high_prob_idxs:
+    #         counter[idx[0]] += 1
+
+    #     input()
+
+    # pretty = [["Label", "Count" ], ["Overall", sum(counter)]]
+    # for idx, count in enumerate(counter):
+    #     pretty += [[utils.topics(idx), count]]
+
+    # print(tabulate(pretty))
+
+
+    ######## BIN CLASSIFIER
     labeled_data = []
     for lf in lfs:
         used_lfs = [lf, dummy1, dummy2]
@@ -873,9 +1059,9 @@ def main():
         applier = PandasLFApplier(lfs=used_lfs)
         label_train = applier.apply(df=df_train)
 
-        analysis = LFAnalysis(L=label_train, lfs=used_lfs).lf_summary()
-        print(analysis)
-        where_label = print_initial_coverage(df_train, label_train)
+        # analysis = LFAnalysis(L=label_train, lfs=used_lfs).lf_summary()
+        # print(analysis)
+        where_label = print_initial_coverage(df_train, label_train, lf.name)
 
         # cardinality = 42
         label_model = LabelModel(cardinality=42, verbose=1, device="cuda")
@@ -887,10 +1073,10 @@ def main():
     labeled_data = np.hstack(labeled_data)
     print(labeled_data)
 
-    write_labels(dataset_num, df_train, labeled_data)
-
+    write_labels(df_train, labeled_data)
 
     # print_model_coverage(df_train)
+    # print_specific_labels(df_train, Topics.DirectoriesofChannelsBots)
 
 
 if __name__ == "__main__":

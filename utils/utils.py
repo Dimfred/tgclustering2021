@@ -4,6 +4,7 @@ from config import config
 import json
 import enum
 import numpy as np
+import re
 
 
 def seed(*args):
@@ -41,8 +42,8 @@ def make_lang_path(num):
     return config.tg_ds / f"{str(num).zfill(2)}-lang.txt"
 
 
-def make_topic_path(num):
-    return config.tg_ds / f"{str(num).zfill(2)}-handtopic.txt"
+def make_topic_path(num, lang):
+    return config.tg_ds / f"{str(num).zfill(2)}-handtopic-{lang}.txt"
 
 
 def make_data_path(num):
@@ -53,12 +54,12 @@ def make_cleansed_path(num):
     return config.tg_ds / f"{str(num).zfill(2)}-cleansed.txt"
 
 
-def make_cleansed_data_path(num):
-    return config.tg_ds / f"{str(num).zfill(2)}-cleansed-data.txt"
+def make_cleansed_data_path(num, lang):
+    return config.tg_ds / f"{str(num).zfill(2)}-cleansed-data-{lang}.txt"
 
 
-def make_snorkel_out_path(num):
-    return config.tg_ds / f"{str(num).zfill(2)}-snorkel.txt"
+def make_snorkel_out_path():
+    return config.tg_ds / f"snorkel.txt"
 
 
 def load_raw(num):
@@ -67,16 +68,272 @@ def load_raw(num):
         lines = f.readlines()
 
     lines = [l.strip().split(",") for l in lines]
+    lines = {int(sidx): labels for sidx, *labels in lines}
+
     return lines
 
 
-def load_data(num):
+def concat_ds_item(ds):
+    s = ds["title"]
+    s += ds["description"]
+    s += " " + " ".join(ds["recent_posts"])
+    return s
+
+
+def load_data(num, concat=False):
     path = make_data_path(num)
     with open(path, "r") as f:
         lines = f.readlines()
 
     lines = [json.loads(l.strip()) for l in lines]
+    # if concat:
+    lines = [clean_data(concat_ds_item(l).lower()) for l in lines]
+
+    lines = {idx: line for idx, line in enumerate(lines)}
     return lines
+
+
+# fmt: off
+stopwords = [
+    "i",
+    "me",
+    "my",
+    "myself",
+    "we",
+    "our",
+    "ours",
+    "ourselves",
+    "you",
+    "you're",
+    "you've",
+    "you'll",
+    "you'd",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
+    "he",
+    "him",
+    "his",
+    "himself",
+    "she",
+    "she's",
+    "her",
+    "hers",
+    "herself",
+    "it",
+    "it's",
+    "its",
+    "itself",
+    "they",
+    "them",
+    "their",
+    "theirs",
+    "themselves",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "this",
+    "that",
+    "that'll",
+    "these",
+    "those",
+    "am",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "having",
+    "do",
+    "does",
+    "did",
+    "doing",
+    "a",
+    "an",
+    "the",
+    "and",
+    "but",
+    "if",
+    "or",
+    "because",
+    "as",
+    "until",
+    "while",
+    "of",
+    "at",
+    "by",
+    "for",
+    "with",
+    "about",
+    "against",
+    "between",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "to",
+    "from",
+    "up",
+    "down",
+    "in",
+    "out",
+    "on",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "s",
+    "t",
+    "can",
+    "will",
+    "just",
+    "don",
+    "don't",
+    "should",
+    "should've",
+    "now",
+    "d",
+    "ll",
+    "m",
+    "o",
+    "re",
+    "ve",
+    "y",
+    "ain",
+    "aren",
+    "aren't",
+    "couldn",
+    "couldn't",
+    "didn",
+    "didn't",
+    "doesn",
+    "doesn't",
+    "hadn",
+    "hadn't",
+    "hasn",
+    "hasn't",
+    "haven",
+    "haven't",
+    "isn",
+    "isn't",
+    "ma",
+    "mightn",
+    "mightn't",
+    "mustn",
+    "mustn't",
+    "needn",
+    "needn't",
+    "shan",
+    "shan't",
+    "shouldn",
+    "shouldn't",
+    "wasn",
+    "wasn't",
+    "weren",
+    "weren't",
+    "won",
+    "won't",
+    "wouldn",
+    "wouldn't",
+]
+stopwords = list(stopwords)
+
+# fmt: on
+# stopwords = r"\s|\s".join(stopwords)
+
+chunk_size = 20
+match_stopwords_chunk = []
+for i in range(int(np.ceil(len(stopwords) / chunk_size))):
+    match_stopwords = r"(\s{}\s)".format(
+        r"\s|\s".join(stopwords[i * chunk_size : (i + 1) * chunk_size])
+    )
+    match_stopwords_chunk.append(match_stopwords)
+
+# match_stopwords = re.compile(match_stopwords)
+print(match_stopwords_chunk)
+
+
+def clean_data(line, debug=False):
+# def clean_data(line, debug=True):
+    if debug:
+        print("--------------------------------------------")
+        print(line)
+
+    # if config.language == "en":
+    #     line = line.encode("ascii", "ignore")
+    #     line = line.decode()
+
+    single_chars = r"[\n|\t|\r|\||·|\[|\]|\(|\)|\"|”|,|“|!|'|;|~|#|\*]+"
+    multi_chars = r"[\-|=|\s|:|.|\.|-|—|_][\-|=|\s|:|.|\.|-|—|_]+"
+    replace_all = r"(({})|({}))".format(single_chars, multi_chars)
+
+    line = re.sub(replace_all, " ", line)
+
+    for chunk in match_stopwords_chunk:
+        line = re.sub(chunk, " ", line)
+
+    # replace all multiple space through one space
+    line = re.sub(r"\s\s+", " ", line).strip()
+
+    # print(line)
+    match_url = r"(https?:\/\/(www\.)?([-a-zA-Z0-9@:%._\+~#=]{1,256})\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*))"
+    # r"(((https|http):\/\/)|(www\.))[\w|\d]+\.\w+", line
+    # found = re.findall(match_url, line)
+
+    # print("--------------------------------------")
+    # print("LINKS", found)
+
+    line = re.sub(match_url, r"\3", line)
+    # lines = re.sub(r"[\d+|\+|:]", "", line)
+    # line = line.sub(r"http[s].*?://(www).*?.)
+    # line = re.sub(r"\.\s", " ", line)
+
+    if debug:
+        print("--------------------------------------")
+        print(line)
+        print(len(line.split(" ")))
+        input()
+
+    return line
 
 
 def load_lang(num):
@@ -85,16 +342,17 @@ def load_lang(num):
         lines = f.readlines()
 
     lines = [l.strip().split(",") for l in lines]
-    return lines
+    langs = {int(idx): lang_code for idx, lang_code in lines}
+    return langs
 
 
-def load_topics(num):
-    path = make_topic_path(num)
+def load_topics(num, lang_code):
+    path = make_topic_path(num, lang_code)
     with open(path, "r") as f:
         lines = f.readlines()
 
     lines = [l.strip().split(",") for l in lines]
-    lines = [(int(idx), topics) for idx, *topics in lines]
+    lines = {int(idx): topics for idx, *topics in lines}
 
     return lines
 
@@ -121,35 +379,106 @@ def load_cleansed(num):
     return lines
 
 
-def load_cleansed_data(num):
-    path = make_cleansed_data_path(num)
+def load_cleansed_data(num, lang):
+    path = make_cleansed_data_path(num, lang)
     with open(path, "r") as f:
         lines = f.readlines()
 
     lines = [l.strip().split(",", 1) for l in lines]
-    lines = [(int(idx), text) for idx, text in lines]
+    lines = {int(idx): text for idx, text in lines}
     return lines
 
 
-def load_snorkel_out(num):
-    path = make_snorkel_out_path(num)
+def load_snorkel(trainset_idxs):
+    path = make_snorkel_out_path()
     with open(path, "r") as f:
         lines = f.readlines()
 
-    lines = [l.strip().split(";", 2) for l in lines]
+    lines = [l.strip().split(";", 3) for l in lines]
 
-    snorkel_out = []
-    for idx, csv_labels, text in lines:
-        idx = int(idx)
+    snorkel_out = {ds_idx: {} for ds_idx in trainset_idxs}
+    for ds_idx, text_idx, csv_labels, text in lines:
+        ds_idx, text_idx = int(ds_idx), int(text_idx)
         label_nums = [int(l) for l in csv_labels.split(",")]
 
         one_hot_labels = [0 for _ in range(42)]
         for label_num in label_nums:
             one_hot_labels[label_num] = 1
 
-        snorkel_out.append((idx, one_hot_labels, text))
+        snorkel_out[ds_idx][text_idx] = (one_hot_labels, text)
 
     return snorkel_out
+
+
+def to_one_hot(hand_labels):
+    one_hot = [0 for _ in range(42)]
+
+    for label in hand_labels:
+        label_idx = topics.index(label)
+        one_hot[label_idx] = 1
+
+    return one_hot
+
+
+def load_training_data(
+    testset_idxs, trainset_idxs, testset_idxs_to_remove_from_train, used_lang
+):
+    unlabeled = {n: load_cleansed_data(n, used_lang) for n in trainset_idxs}
+
+    if used_lang == "en":
+        snorkeled = load_snorkel(trainset_idxs)
+    else:
+        print("0 snorkel")
+        snorkeled = {}
+
+    testsets = {n: load_topics(n, used_lang) for n in testset_idxs}
+    # print("TEST1:", len(testsets[0]))
+
+
+    idxs_to_del_from_test = []
+
+    # copy text from data to testset and convert testset labels to one_hot
+    for ds_idx in testset_idxs:
+        data = unlabeled[ds_idx]
+        for text_idx in testsets[ds_idx]:
+            if text_idx not in unlabeled[ds_idx]:
+                idxs_to_del_from_test.append((ds_idx, text_idx))
+                continue
+
+            text = unlabeled[ds_idx][text_idx]
+            labels = testsets[ds_idx][text_idx]
+
+            # print(text)
+            # print(labels)
+            # input()
+
+            testsets[ds_idx][text_idx] = (to_one_hot(labels), text)
+
+    print("IDXS DELETED FROM TESTSET", len(idxs_to_del_from_test))
+    for ds_idx, text_idx in idxs_to_del_from_test:
+        del testsets[ds_idx][text_idx]
+
+    if used_lang == "en":
+        # remove all data which is present in snorkel from unlabeled
+        for ds_idx in trainset_idxs:
+            for text_idx in snorkeled[ds_idx]:
+                if text_idx in unlabeled[ds_idx]:
+                    del unlabeled[ds_idx][text_idx]
+
+    # remove all data which is present in testset from unlabeled
+    for ds_idx in testset_idxs:
+        for text_idx in testsets[ds_idx]:
+            if text_idx in unlabeled[ds_idx]:
+                del unlabeled[ds_idx][text_idx]
+
+    if used_lang == "en":
+        # remove the testset entries from the trainings set
+        for ds_idx in testset_idxs_to_remove_from_train:
+            for test_text_idx in testsets[ds_idx]:
+                if test_text_idx in snorkeled[ds_idx]:
+                    del snorkeled[ds_idx][test_text_idx]
+
+    return snorkeled, testsets, unlabeled
 
 
 def load_test_data(num):

@@ -33,20 +33,20 @@ def write_result(file, idx, res):
 
 if __name__ == "__main__":
 
-    dataset_num = 2
+    dataset_num = 3
 
-    labels_out = utils.make_raw_path(dataset_num)
-    ds = utils.load_data(dataset_num)
-    lang = utils.load_lang(dataset_num)
+    labels_out = "03-raw.txt" #utils.make_raw_path(dataset_num)
+
+    ds = utils.load_cleansed_data(dataset_num, "en")
 
     client = lv1.LanguageServiceClient()
 
-    for idx, (item, lang) in enumerate(zip(ds, lang)):
-        lang = lang[1]
-        if lang != "en":
-            continue
+    for idx, text in ds.items():
+        # lang = lang[1]
+        # if lang != "en":
+        #     continue
 
-        text = concat_ds_item(item)
+        # text = concat_ds_item(item)
         # text = concat_ds_item(ds[14])
         doc = lv1.Document(content=text, type_=lv1.Document.Type.PLAIN_TEXT)
 

@@ -43,22 +43,26 @@ class GUI:
         raw = utils.load_raw(self.dsnum)
         data = utils.load_data(self.dsnum)
 
+        start_idx = 0
+        counter = -1
         for r, d in zip(raw[start_idx:], data[start_idx:]):
+            counter += 1
             if len(r) < 3:
                 continue
 
-            has_high_prob = False
-            for label_or_confidence in r[1:]:
-                try:
-                    label_or_confidence = float(label_or_confidence)
-                    if label_or_confidence > 0.8:
-                        has_high_prob = True
-                        break
-                except:
-                    pass
+            print(counter)
+            # has_high_prob = False
+            # for label_or_confidence in r[1:]:
+            #     try:
+            #         label_or_confidence = float(label_or_confidence)
+            #         if label_or_confidence > 0.8:
+            #             has_high_prob = True
+            #             break
+            #     except:
+            #         pass
 
-            if not has_high_prob:
-                continue
+            # if not has_high_prob:
+            #     continue
 
 
             idx = r[0]
